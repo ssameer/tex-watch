@@ -1,0 +1,113 @@
+#!/bin/bash
+
+# TODO: Obtain dependencies automatically and recursively from the main LaTex file
+
+show_help() {
+  cat << EOF
+  Usage: tex-watch [-h] [-l LATEX] [-v VIEWER] [-b BIBTEX] [-o OUTPUT_DIR] MAINFILE.tex [FILES] [DIRECTORIES] ...
+  Recompile MAINFILE.tex whenever it or FILES or DIRECTOIRES change and update
+  (or launch) mupdf to show the output if compilation is successful.
+
+  -h        Display this help and exit
+  -v        Alternate viewer [mupdf]
+  -l        Alternate latex compiler [pdflatex]
+  -b        Alternate bibtex program [bibtex8] Use false to disable bibtex
+  -o        Output directory (if not the current directory)
+  -p        Use precompiled preamble
+  DIRECTORIES   These are added to TEXINPUTS
+
+  Requirements: inotify-tools and optionally mupdf (fast pdf viewer),
+  texlive-mylatexformat (precompiled preamble).
+EOF
+}
+
+# mupdf needs reload signal; okular, evince, xpdf, skim, ghostview auto-reload. No support for acroread.
+VIEWER=mupdf
+LATEX=pdflatex
+BIBTEX=bibtex8   # set to false to disable bibtex
+OUTPUT_DIR=
+PRECOMPILE=false # Use precompiled preamble
+# Set RERUN to run Latex multiple times to resolve citations / references. Not needed in normal workflow.
+#RERUN=true
+while getopts "hv:l:b:o:p" OPT; do
+  case "$OPT" in
+    h) show_help
+      exit 0 ;;
+    v) VIEWER="$OPTARG" ;;
+    l) LATEX="$OPTARG" ;;
+    b) BIBTEX="$OPTARG" ;;
+    o) OUTPUT_DIR="$OPTARG" ;;
+    p) PRECOMPILE=true ;;
+  esac
+done
+shift "$((OPTIND-1))" 
+if [ $# -eq 0 ]; then
+  show_help
+  exit 1
+fi
+ARGS="-interaction=nonstopmode -synctex=1 ${OUTPUT_DIR:+-output-directory=$OUTPUT_DIR}"
+if [ -v $OUTPUT_DIR ]; then
+  [[ -d $OUTPUT_DIR ]] || mkdir -p $OUTPUT_DIR
+  export BIBINPUTS=$OUTPUT_DIR:$BIBINPUTS # biblatex puts generated *-blx.bib in OUTPUT_DIR
+fi
+
+
+# Do we need to run BibTeX?
+run_bibtex() { # bbl file used according to $1.log && bib file was changed or we have undefined citation.
+  grep -q "$1.bbl" "$1.log" && [[ $2 == *.bib* ]] || grep -q Citation.*undefined "$1.log"  && \
+    $BIBTEX "$MAIN" 2>&1 >/dev/null
+}
+
+run_latex() {
+  pdfout=false
+  $LATEX $ARGS "$1" 2>&1 | grep -q "Output written on" && pdfout=true
+}
+
+compile() {
+  run_latex "$MAINTEX" && run_bibtex "$MAIN" "$1" && [ -v RERUN ] && run_latex "$MAINTEX"
+}
+
+# Precompile static preamble
+make_format() {
+  if [ -v PRECOMPILE -a ! -s "$MAIN.fmt" ]; then
+    test `head -c 2 "$MAINTEX"` == "%&" && grep -q endofdump "$MAINTEX" && 
+    $LATEX $ARGS -ini -jobname "$MAIN" "&pdflatex" mylatexformat.ltx "$MAINTEX" 2>&1 >/dev/null
+  fi
+}
+
+# Do we need to rerun LaTeX?
+check_rerun() {
+  grep -q Rerun "$1.log" 
+}
+
+for f in "$@"; do
+  if [ ! -e "$f" ]; then 
+    echo "File $f doesn't exist.";
+    exit 1;
+  fi
+  if [ -d "$f" ]; then          # Add directories to TEXINPUTS
+    export TEXINPUTS="$f":$TEXINPUTS
+  fi
+done
+MAINTEX="$1"
+MAIN="${OUTPUT_DIR:+$OUTPUT_DIR/}${MAINTEX%%.tex}"
+OUT="$MAIN.pdf"
+while true; do
+  if [ ! -v STARTUP ] || event=$(inotifywait -q -e modify -e delete_self "$@") ; then 
+    make_format; 
+    compile "$event";
+    if $pdfout; then
+      if ps u -C $VIEWER | grep -q "$OUT" ; then
+        [[ $VIEWER == 'mupdf' ]] && killall -HUP mupdf; # mupdf requires a reload signal
+      else
+        $VIEWER "$OUT" &
+      fi
+    fi
+    STARTUP="done"
+#  else
+#    exit 1;
+  fi
+  [ -r $MAINTEX ] || sleep 5 && [ -r $MAINTEX ] || exit 1  # File not found for 5 seconds
+#  if [ -N "$OUT" -a -s "$OUT" ]; then  # File exists, is not empty and modified after last read
+#  fi
+done &
