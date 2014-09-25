@@ -46,8 +46,8 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 ARGS="-interaction=nonstopmode -synctex=1 ${OUTPUT_DIR:+-output-directory=$OUTPUT_DIR}"
-if [ -v $OUTPUT_DIR ]; then
-  [[ -d $OUTPUT_DIR ]] || mkdir -p $OUTPUT_DIR
+if [ -v OUTPUT_DIR ]; then
+  [ -d $OUTPUT_DIR ] || mkdir -p $OUTPUT_DIR
   export BIBINPUTS=$OUTPUT_DIR:$BIBINPUTS # biblatex puts generated *-blx.bib in OUTPUT_DIR
 fi
 
@@ -104,10 +104,6 @@ while true; do
       fi
     fi
     STARTUP="done"
-#  else
-#    exit 1;
   fi
-  [ -r $MAINTEX ] || sleep 5 && [ -r $MAINTEX ] || exit 1  # File not found for 5 seconds
-#  if [ -N "$OUT" -a -s "$OUT" ]; then  # File exists, is not empty and modified after last read
-#  fi
+  [ -r $MAINTEX ] || { sleep 5 && [ -r $MAINTEX ] || exit 1 ; }  # File not found for 5 seconds
 done &
