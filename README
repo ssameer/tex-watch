@@ -1,0 +1,59 @@
+Automatic continuous recompilation for LaTeX files on change. The pdf viewer is launched or refreshed after compilation. The whole process is fast enough to simulate WYSIWIG.
+
+Features:
+---------
+- Supports multi-file LaTeX project in multiple directories.
+- Supports pdflatex, xelatex, lualatex on TexLive.
+- Supports bibtex, bibtex8.
+- Supports precompiled header with make format.
+- Supports launching viewers: mupdf, Okular, evince, xpdf, skim, ghostview. mupdf is sent a refresh signal when new pdf is available. Other viewer suto-reload.
+- Supports using another directory for output and auxilliary files to reduce clutter in main directory.
+
+Requirements:
+------------
+Linux (file change detection is specific to Linux) with inotify-tools installed, Bash, 
+TexLive (texlive-mylatexformat for precompiled preamble)
+
+How to use:
+-----------
+Launch tex-watch as described below. It will compile the LaTex file and if successful, launch your chosen viewer. Use an editor that saves the file frequently (See below to set up Vim for this.) Whenever on eof the project files is changed, tex-watch will recompile and refresh the viewer on success. mupdf is recommended for speed.
+
+Put this in ~/.vim/ftplugin/tex.vim to save your LaTeX files frequently.
+autocmd CursorHoldI,InsertLeave,BufLeave,FocusLost <buffer> update
+
+
+Usage: 
+------
+tex-watch [-h] [-l LATEX] [-v VIEWER] [-b BIBTEX] [-o OUTPUT_DIR] MAINFILE.tex [FILES] [DIRECTORIES] ...
+  Recompile MAINFILE.tex whenever it or FILES or DIRECTOIRES change and update
+  (or launch) mupdf to show the output if compilation is successful.
+
+  -h        Display this help and exit
+  -v        Alternate viewer [mupdf]
+  -l        Alternate latex compiler [pdflatex]
+  -b        Alternate bibtex program [bibtex8] Use false to disable bibtex
+  -o        Output directory (if not the current directory)
+  -p        Use precompiled preamble
+  DIRECTORIES   These are added to TEXINPUTS
+
+  Requirements: inotify-tools and optionally mupdf (fast pdf viewer),
+  texlive-mylatexformat (precompiled preamble).
+
+
+Inspiration:
+------------
+Similar functionality in IDEs:
+kile, gummi, etc.
+
+Automatic compilation: 
+latexmk: Perl based; too slow for continuous compilation.
+
+Vim specific:
+vim-live-latex-preview (https://bbs.archlinux.org/viewtopic.php?id=107164)
+
+TODO:
+-----
+Test with biber
+Test with plain LaTeX (dvi output) and ConText.
+Automatically get list of dependencies from main LaTeX file.
+Port to Windows, Mac OSX.
