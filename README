@@ -1,13 +1,13 @@
-Automatic continuous recompilation for LaTeX files on change. The pdf viewer is launched or refreshed after compilation. The whole process is fast enough to simulate WYSIWIG.
+Automatic continuous recompilation for LaTeX files on change. The PDF viewer is launched or refreshed after compilation. The whole process is fast enough to simulate WYSIWIG.
 
 Features:
 ---------
 - Supports multi-file LaTeX project in multiple directories.
 - Supports pdflatex, xelatex, lualatex on TexLive.
 - Supports bibtex, bibtex8.
-- Supports precompiled header with make format.
-- Supports launching viewers: mupdf, Okular, evince, xpdf, skim, ghostview. mupdf is sent a refresh signal when new pdf is available. Other viewer suto-reload.
-- Supports using another directory for output and auxilliary files to reduce clutter in main directory.
+- Supports precompiled preamble with make format.
+- Supports launching viewers: mupdf, Okular, evince, xpdf, skim, ghostview. mupdf is sent a refresh signal when a new PDF is available. Other viewers auto-reload.
+- Supports using another directory for output and auxiliary files to reduce clutter in main directory.
 
 Requirements:
 ------------
@@ -16,11 +16,15 @@ TexLive (texlive-mylatexformat for precompiled preamble)
 
 How to use:
 -----------
-Launch tex-watch as described below. It will compile the LaTex file and if successful, launch your chosen viewer. Use an editor that saves the file frequently (See below to set up Vim for this.) Whenever on eof the project files is changed, tex-watch will recompile and refresh the viewer on success. mupdf is recommended for speed.
+Launch tex-watch as described below. It will compile the LaTex file and if successful, launch your chosen viewer. Use an editor that saves the file frequently. (See below to set up Vim for this.) Whenever any of the project files is changed, tex-watch will recompile and refresh the viewer on success. mupdf is recommended for speed.
 
-Put this in ~/.vim/ftplugin/tex.vim to save your LaTeX files frequently.
-autocmd CursorHoldI,InsertLeave,BufLeave,FocusLost <buffer> update
+Put this in ~/.vim/ftplugin/tex.vim to save your LaTeX files whenever they are changed:
+autocmd TextChanged,TextChangedI <buffer> update
+Caution: Please have the undo feature set up properly before using this or you may lose important edits!
 
+Follow this how-to to use a precompiled preamble:
+http://www.howtotex.com/tips-tricks/faster-latex-part-iv-use-a-precompiled-preamble/
+This is especially useful if you use many packages.
 
 Usage: 
 ------
