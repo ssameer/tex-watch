@@ -20,6 +20,9 @@ Launch tex-watch as described below. It will compile the LaTex file and if succe
 
 Put this in ~/.vim/ftplugin/tex.vim to save your LaTeX files whenever they are changed:
 autocmd TextChanged,TextChangedI <buffer> update
+If you prefer to wait till you have finished typing, add this instead:
+set autosave=2
+Vim will now wait for 2 seconds after the last file change before writing the file (0 disables autosave).
 Caution: Please have the undo feature set up properly before using this or you may lose important edits!
 
 Follow this how-to to use a precompiled preamble:
@@ -47,12 +50,13 @@ tex-watch [-h] [-l LATEX] [-v VIEWER] [-b BIBTEX] [-o OUTPUT_DIR] MAINFILE.tex [
 Inspiration:
 ------------
 Similar functionality in IDEs:
-kile, gummi, etc.
+gummi, etc.
 
 Automatic compilation: 
 latexmk: Perl based; too slow for continuous compilation.
 
-Vim specific:
+Preview:
+Emacs + AucTex + preview-latex  (https://www.gnu.org/software/auctex/preview-latex.html)
 vim-live-latex-preview (https://bbs.archlinux.org/viewtopic.php?id=107164)
 
 TODO:
