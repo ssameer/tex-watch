@@ -61,3 +61,7 @@ Test with biber
 Test with plain LaTeX (dvi output) and ConText.
 Automatically get list of dependencies from main LaTeX file.
 Port to Windows, Mac OSX.
+
+Bugs:
+----
+Will not detect changes to preamble (eg: new package) if PRECOMPILE is used. Delete the .fmt file to get it to notice the changes.

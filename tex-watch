@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# TODO: Background events - If files get changes while compiling, recompile when done.
-# Use bash process substitution or coproc
 # TODO: Obtain dependencies automatically and recursively from the main LaTex file
 # TODO: Will not detect changes to preamble if PRECOMPILE is used
 
@@ -31,7 +29,7 @@ BIBTEX=bibtex8   # set to false to disable bibtex
 OUTPUT_DIR=
 PRECOMPILE=false # Use precompiled preamble
 # Set RERUN to run Latex multiple times to resolve citations / references. Not needed in normal workflow.
-#RERUN=true
+RERUN=false
 while getopts "hv:l:b:o:p" OPT; do
   case "$OPT" in
     h) show_help
@@ -55,33 +53,49 @@ if [ -v OUTPUT_DIR ]; then
 fi
 
 
-# Do we need to run BibTeX?
+# Do we need to run BibTeX? Might be better to just run it instead of checking...
 run_bibtex() { # bbl file used according to $1.log && bib file was changed or we have undefined citation.
-  grep -q "$1.bbl" "$1.log" && [[ $2 == *.bib* ]] || grep -q Citation.*undefined "$1.log"  && \
+   [[ $2 == *.bib* ]] && grep -F -q "$1.bbl" "$1.log" || grep -q Citation.*undefined "$1.log"  && \
     $BIBTEX "$MAIN" 2>&1 >/dev/null
 }
 
 run_latex() {
   pdfout=false
-  $LATEX $ARGS "$1" 2>&1 | grep -q "Output written on" && pdfout=true
+  $LATEX $ARGS "$1" 2>&1 | grep -F -q "Output written on" && pdfout=true
 }
 
 # Precompile static preamble
 make_format() {
-  if [ -v PRECOMPILE -a ! -s "$MAIN.fmt" ]; then
-    test `head -c 2 "$MAINTEX"` == "%&" && grep -q endofdump "$MAINTEX" && 
-    $LATEX $ARGS -ini -jobname "$MAIN" "&pdflatex" mylatexformat.ltx "$MAINTEX" 2>&1 >/dev/null
+  if `$PRECOMPILE` && [ ! -s "$MAIN.fmt" ]; then
+    [[ `head -c 2 "$MAINTEX"` == "%&" ]] && grep -F -q endofdump "$MAINTEX" && 
+    $LATEX $ARGS -ini -jobname "${MAIN##*/}" "&pdflatex" mylatexformat.ltx "$MAINTEX" 2>&1 >/dev/null
   fi
 }
 
 compile() {
   make_format;
-  run_latex "$MAINTEX" && run_bibtex "$MAIN" "$1" && [ -v RERUN ] && run_latex "$MAINTEX"
+  run_latex "$MAINTEX" && run_bibtex "$MAIN" "$1" && `$RERUN` && run_latex "$MAINTEX"
 }
 
 # Do we need to rerun LaTeX?
 check_rerun() {
-  grep -q Rerun "$1.log" 
+  grep -F -q Rerun "$1.log" 
+}
+
+view() {
+  if $pdfout; then
+    if vpid=$(pgrep -f "$VIEWER.*$OUT") ; then
+      [[ $VIEWER == mupdf* ]] && kill -HUP $vpid; # mupdf requires a reload signal
+    else
+      $VIEWER "$OUT" &
+    fi
+  fi
+}
+
+watch_files() {
+  while true; do
+    inotifywait -q -e modify -e delete_self "$@"
+  done
 }
 
 for f in "$@"; do
@@ -96,17 +110,10 @@ done
 MAINTEX="$1"
 MAIN="${OUTPUT_DIR:+$OUTPUT_DIR/}${MAINTEX%%.tex}"
 OUT="$MAIN.pdf"
-while true; do
-  if [ ! -v STARTUP ] || event=$(inotifywait -q -e modify -e delete_self "$@") ; then 
-    compile "$event";
-    if $pdfout; then
-      if ps u -C $VIEWER | grep -q "$OUT" ; then
-        [[ $VIEWER == 'mupdf' ]] && killall -HUP mupdf; # mupdf requires a reload signal
-      else
-        $VIEWER "$OUT" &
-      fi
-    fi
-    STARTUP="done"
-  fi
+
+compile "$event"; view;
+watch_files $@ | while read event ;
+do
+  compile "$event"; view;
   [ -r $MAINTEX ] || { sleep 5 && [ -r $MAINTEX ] || exit 1 ; }  # File not found for 5 seconds
 done &
