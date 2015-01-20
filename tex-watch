@@ -3,6 +3,8 @@
 # TODO: Obtain dependencies (files and directories) automatically and recursively (using the file name recorder feature)
 # TODO: Will not detect changes to preamble if PRECOMPILE is used
 # TODO: Test dvi
+# TODO: Kill running tex-watch if rerun (?)
+# TODO: Kill pdflatex after time-out
 
 show_help() {
   cat << EOF
@@ -11,10 +13,10 @@ show_help() {
   (or launch) mupdf to show the output if compilation is successful.
 
   -h        Display this help and exit
-  -v        Alternate viewer [mupdf]
-  -l        Alternate latex compiler [pdflatex]
-  -b        Alternate bibtex program [bibtex8] Use false to disable bibtex
-  -o        Output directory (if not the current directory)
+  -v        Viewer [mupdf]
+  -l        Latex compiler [pdflatex]
+  -b        Bibtex [bibtex8] Use false to disable bibtex
+  -o        Output and auxilliary files directory [.]
   -p        Use precompiled preamble
   DIRECTORIES   These are added to TEXINPUTS
 
@@ -47,6 +49,14 @@ if [ $# -eq 0 ]; then
   show_help
   exit 1
 fi
+[ `which $VIEWER` ] || \
+  ( echo $VIEWER not found. Please install it or specify another viewer. && exit )
+[ `which $LATEX` ] || \
+  ( echo $LATEX not found.  Please install it or specify another TeX compiler && exit )
+[ `which $BIBTEX` ] || \
+  ( echo $BIBTEX not found. Please install it or specify another bibtex program. && exit )
+[ `which inotifywait` ] || ( echo inotify-tools not found. && exit )
+
 ARGS="-interaction=nonstopmode -synctex=1 ${OUTPUT_DIR:+-output-directory=$OUTPUT_DIR}"
 if [ -v OUTPUT_DIR ]; then
   [ -d $OUTPUT_DIR ] || mkdir -p $OUTPUT_DIR
