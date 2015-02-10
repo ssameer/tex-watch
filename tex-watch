@@ -5,6 +5,7 @@
 # TODO: Test dvi
 # TODO: Kill running tex-watch if rerun (?)
 # TODO: Kill pdflatex after time-out
+# TODO: Ignore file if deleted. Currently goes into error loop.
 
 show_help() {
   cat << EOF
@@ -22,6 +23,7 @@ show_help() {
 
   Requirements: inotify-tools and optionally mupdf (fast pdf viewer),
   texlive-mylatexformat (precompiled preamble).
+  notify-send for desktop notifications.
 EOF
 }
 
@@ -33,6 +35,7 @@ OUTPUT_DIR=
 PRECOMPILE=false # Use precompiled preamble
 # Set RERUN to true to run Latex multiple times to resolve citations / references. Not needed in normal workflow.
 RERUN=false
+NOTIFY=notify-send  # Desktop notifications
 while getopts "hv:l:b:o:p" OPT; do
   case "$OPT" in
     h) show_help
@@ -56,6 +59,7 @@ fi
 [ `which $BIBTEX` ] || \
   ( echo $BIBTEX not found. Please install it or specify another bibtex program. && exit )
 [ `which inotifywait` ] || ( echo inotify-tools not found. && exit )
+[ `which notify-send` ] || ( NOTIFY=false; echo notify-send not found. Desktop notifications not available. )
 
 ARGS="-interaction=nonstopmode -synctex=1 ${OUTPUT_DIR:+-output-directory=$OUTPUT_DIR}"
 if [ -v OUTPUT_DIR ]; then
@@ -63,14 +67,18 @@ if [ -v OUTPUT_DIR ]; then
   export BIBINPUTS=$OUTPUT_DIR:$BIBINPUTS # biblatex puts generated *-blx.bib in OUTPUT_DIR
 fi
 
+ICON_E=/usr/share/icons/default.kde4/scalable/status/dialog-error.svgz
+ICON_W=/usr/share/icons/default.kde4/scalable/status/dialog-warning.svgz
+ICON_G=/usr/share/icons/default.kde4/scalable/status/user-online.svgz
 
 # Do we need to run BibTeX? Might be better to just run it instead of checking...
 run_bibtex() { # bbl file used according to $1.log && bib file was changed or we have undefined citation.
    [[ $2 == *.bib* ]] && grep -F -q "$1.bbl" "$1.log" || grep -q Citation.*undefined "$1.log"  && \
-    $BIBTEX "$MAIN" 2>&1 >/dev/null
+    $BIBTEX "$MAIN" 2>&1 >$BIBLOG
 }
 
 run_latex() {
+  oldpdfout=${pdfout:-true}
   pdfout=false
   $LATEX $ARGS "$1" 2>&1 | grep -F -q "Output written on" && pdfout=true
 }
@@ -100,6 +108,9 @@ view() {
     else
       $VIEWER "$OUT" &
     fi
+    if ! $oldpdfout; then $NOTIFY -t 1000 -i "$ICON_G" "$MAINTEX" ; fi
+  else
+    if $oldpdfout; then $NOTIFY -t 1000 -i "$ICON_E" "$MAINTEX" ; fi
   fi
 }
 
@@ -121,6 +132,7 @@ done
 MAINTEX="$1"
 MAIN="${OUTPUT_DIR:+$OUTPUT_DIR/}${MAINTEX%%.tex}"
 OUT="$MAIN.pdf"
+BIBLOG=${MAIN}.biblog
 
 compile "$event"; view;
 watch_files $@ | while read event ;
